@@ -10,7 +10,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +43,7 @@ public class PhotoGalleryFragment extends Fragment {
         View v = inflater.inflate(R.layout.fragment_photo_gallery, container, false);
 
         mPhotoRecyclerView = (RecyclerView)v.findViewById(R.id.fragment_photo_gallery_recycler_view);
-        mPhotoRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 3));
+        dynColumns();
 
         mPhotoRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 
@@ -66,6 +69,20 @@ public class PhotoGalleryFragment extends Fragment {
 
         return v;
     }
+
+    // Dynamic configuration number of columns on display
+    private void dynColumns() {
+        mPhotoRecyclerView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                mPhotoRecyclerView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                int numberColumns = mPhotoRecyclerView.getWidth()/360;
+                mPhotoRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),numberColumns));
+            }
+        });
+    }
+
+
 
     private void setupAdapter() {
         if (isAdded()) {
