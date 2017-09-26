@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.util.Log;
+import android.util.LruCache;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,11 +15,13 @@ import java.util.concurrent.ConcurrentMap;
 public class ThumbnailDownloader<T> extends HandlerThread {
     private static final String TAG = "ThumbnailDownloader";
     private static final int MESSAGE_DOWNLOAD = 0;
+    private static final int MESSAGE_PRELOAD = 1;
 
     private Handler mRequestHandler;
     private ConcurrentMap<T, String> mRequestMap = new ConcurrentHashMap<>();
     private Handler mResponseHandler;
     private ThumbnailDownloadListener<T> mThumbnailDownloadeListener;
+    private LruCache<String, Bitmap> mLruCache;
 
     public interface ThumbnailDownloadListener<T> {
         void onThumbnailDownloaded(T target, Bitmap thumbnail);
@@ -31,6 +34,7 @@ public class ThumbnailDownloader<T> extends HandlerThread {
     public ThumbnailDownloader(Handler responseHandler) {
         super(TAG);
         mResponseHandler = responseHandler;
+        mLruCache = new LruCache<String, Bitmap>(20480);
     }
 
     @Override
@@ -38,10 +42,16 @@ public class ThumbnailDownloader<T> extends HandlerThread {
         mRequestHandler = new Handler() {
             @Override
             public void handleMessage(Message msg) {
-                if (msg.what == MESSAGE_DOWNLOAD) {
-                    T target = (T) msg.obj;
-                    Log.i(TAG, "Got a request for URL: " + mRequestMap.get(target));
-                    handleRequest(target);
+                switch (msg.what) {
+                    case MESSAGE_DOWNLOAD:
+                        T target = (T) msg.obj;
+                        Log.i(TAG, "Got a request for URL: " + mRequestMap.get(target));
+                        handleRequest(target);
+                        break;
+                    case MESSAGE_PRELOAD:
+                        String url = (String) msg.obj;
+                        downLoadImage(url);
+                        break;
                 }
             }
         };
@@ -58,37 +68,66 @@ public class ThumbnailDownloader<T> extends HandlerThread {
         }
     }
 
+    public void preLoadImage(String url) {
+        mRequestHandler.obtainMessage(MESSAGE_PRELOAD, url).sendToTarget();
+    }
+
     // Очистка очереди
     public void clearQueue() {
         mRequestHandler.removeMessages(MESSAGE_DOWNLOAD);
     }
 
+    // Очистка кэша
+    public void clearCache() {
+        mLruCache.evictAll();
+    }
+
+    // Получение закэшированного изображения
+    public Bitmap getCachedImage(String url) {
+        return mLruCache.get(url);
+    }
+
     private void handleRequest(final T target) {
-        try {
-            final String url = mRequestMap.get(target);
-            if (url == null) {
-                return;
-            }
-            byte[] bitmapBytes = new FlickrFetchr().getUrlBytes(url);
-            final Bitmap bitmap = BitmapFactory
-                    .decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
-            Log.i(TAG, "Bitmap created");
+        final String url = mRequestMap.get(target);
+        final Bitmap bitmap;
+        if (url == null) return;
 
-            // Загрузка и вывод
-            mResponseHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (mRequestMap.get(target) != url) {
-                        return;
-                    }
+        bitmap = downLoadImage(url);
+        Log.i(TAG, "Bitmap created");
 
-                    mRequestMap.remove(target);
-                    mThumbnailDownloadeListener.onThumbnailDownloaded(target, bitmap);
+        // Загрузка и вывод
+        mResponseHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mRequestMap.get(target) != url) {
+                    return;
                 }
-            });
 
-            } catch (IOException ioe) {
-                Log.e(TAG, "Error download image", ioe);
+                mRequestMap.remove(target);
+                mThumbnailDownloadeListener.onThumbnailDownloaded(target, bitmap);
+            }
+        });
+    }
+
+    private Bitmap downLoadImage(String url) {
+        Bitmap bitmap;
+
+        if (url == null) return null;
+
+        // Если картинка уже в кэше, не загружать ее
+        bitmap = mLruCache.get(url);
+        if (bitmap != null) return bitmap;
+
+        // Загрузка и кэширование изображения
+        try {
+            byte[] bitmapBytes = new FlickrFetchr().getUrlBytes(url);
+            bitmap = BitmapFactory.decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
+            mLruCache.put(url, bitmap);
+            Log.i(TAG, "Download and cached image: " + url);
+            return bitmap;
+        } catch (IOException ex) {
+            Log.e(TAG, "Error downloading image.", ex);
+            return null;
         }
     }
 }

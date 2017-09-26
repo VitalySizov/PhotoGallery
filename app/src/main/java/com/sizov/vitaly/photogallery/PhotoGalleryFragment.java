@@ -162,12 +162,37 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(PhotoHolder photoholder, int position) {
+
             GalleryItem galleryItem = mGalleryItems.get(position);
-            Drawable placeholder = getResources().getDrawable(R.drawable.bill_up_close);
-            photoholder.bindDrawable(placeholder);
-            mThumbnailDownloader.queueThumbnail(photoholder, galleryItem.getUrl());
-            lastBoundPosition = position;
-            Log.i(TAG,"Last bound position is " + Integer.toString(lastBoundPosition));
+            Bitmap bitmap = mThumbnailDownloader.getCachedImage(galleryItem.getUrl());
+
+            if (bitmap == null) {
+                Drawable placeholder = getResources().getDrawable(R.drawable.bill_up_close);
+                photoholder.bindDrawable(placeholder);
+                mThumbnailDownloader.queueThumbnail(photoholder, galleryItem.getUrl());
+            } else {
+                Log.i(TAG, "Loaded image from cache");
+                photoholder.bindDrawable(new BitmapDrawable(getResources(), bitmap));
+            }
+
+            preLoadAdjacentImage(position);
+
+            //lastBoundPosition = position;
+            //Log.i(TAG,"Last bound position is " + Integer.toString(lastBoundPosition));
+        }
+
+        private void preLoadAdjacentImage(int position) {
+            final int imageBufferSize = 10;
+
+            int startIndex = Math.max(position - imageBufferSize, 0);
+            int endIndex = Math.min(position + imageBufferSize, mGalleryItems.size() - 1);
+
+            for (int i = startIndex; i <= endIndex; i++) {
+                if (i == position) continue;
+
+                String url = mGalleryItems.get(i).getUrl();
+                mThumbnailDownloader.preLoadImage(url);
+            }
         }
 
         @Override
