@@ -1,5 +1,7 @@
 package com.sizov.vitaly.photogallery;
 
+import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -19,6 +21,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -71,7 +74,6 @@ public class PhotoGalleryFragment extends Fragment {
 
         mPhotoRecyclerView = (RecyclerView)v.findViewById(R.id.fragment_photo_gallery_recycler_view);
         dynColumns();
-
         mPhotoRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 
             @Override
@@ -114,6 +116,15 @@ public class PhotoGalleryFragment extends Fragment {
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
+                // Скрытие клавиатуры
+                hideKeyboard(getActivity());
+
+                // Очистка и скрытие SearchView
+                hideSearchView();
+
+                // Очистка RecyclerView
+                mItems.clear();
+
                 Log.d(TAG, "QueryTextSubmit: " + query);
                 QueryPreferences.setStoredQuery(getActivity(), query);
                 updateItems();
@@ -124,6 +135,18 @@ public class PhotoGalleryFragment extends Fragment {
             public boolean onQueryTextChange(String newText) {
                 Log.d(TAG, "QueryTextChange: " + newText);
                 return false;
+            }
+
+            // Скрывание клавиатуры после запроса
+            private void hideKeyboard(Activity activity) {
+                InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(activity.getCurrentFocus().getWindowToken(), 0);
+            }
+
+            private void hideSearchView() {
+                searchView.setQuery("", false);
+                searchView.clearFocus();
+                searchView.setIconified(true);
             }
         });
 
@@ -216,7 +239,7 @@ public class PhotoGalleryFragment extends Fragment {
         }
 
         @Override
-        public void onBindViewHolder(PhotoHolder photoHolder, int position) {
+        public void onBindViewHolder(PhotoHolder photoHolder, final int position) {
             GalleryItem galleryItem = mGalleryItems.get(position);
             Drawable placeholder = getResources().getDrawable(R.drawable.bill_up_close);
             photoHolder.bindDrawable(placeholder);
