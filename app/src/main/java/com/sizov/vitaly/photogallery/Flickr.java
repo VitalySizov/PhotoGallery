@@ -17,6 +17,7 @@ public class Flickr {
             public String id;
             public String title;
             public String url_s;
+            public String owner;
         }
     }
 }
