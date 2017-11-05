@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 
 // Создание Web - активности
 public class PhotoPageActivity extends SingleFragmentActivity {
@@ -16,5 +17,18 @@ public class PhotoPageActivity extends SingleFragmentActivity {
     @Override
     protected Fragment createFragment() {
         return PhotoPageFragment.newInstance(getIntent().getData());
+    }
+
+    @Override
+    public void onBackPressed() {
+
+        PhotoPageFragment fragment = (PhotoPageFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.fragmentContainer);
+
+        if (fragment.getWebView().canGoBack()) {
+            fragment.getWebView().goBack();
+        } else {
+            super.onBackPressed();
+        }
     }
 }
