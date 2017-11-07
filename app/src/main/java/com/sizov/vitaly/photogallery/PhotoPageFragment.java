@@ -1,6 +1,7 @@
 package com.sizov.vitaly.photogallery;
 
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -62,7 +63,15 @@ public class PhotoPageFragment extends VisibleFragment {
 
         mWebView.setWebViewClient(new WebViewClient() {
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return false;
+
+                // Support for other links
+                if (url.startsWith("http://") || (url.startsWith("https://"))) {
+                    return false;
+                } else {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    startActivity(i);
+                    return true;
+                }
             }
         });
         mWebView.loadUrl(mUri.toString());
